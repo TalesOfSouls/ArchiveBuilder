@@ -1,0 +1,10 @@
+text eol=lf
+
+*.c text
+*.cpp text
+*.h text
+
+*.themetxt text
+*.fonttxt text
+*.objtxt text
+*.langtxt text
