@@ -3,6 +3,13 @@
 #include <string.h>
 
 #define OPENGL 1
+
+#ifdef DEBUG
+    #undef DEBUG
+#endif
+
+#define DEBUG 0
+
 #include "debug.h"
 #include "../GameEngine/log/Debug.cpp"
 
