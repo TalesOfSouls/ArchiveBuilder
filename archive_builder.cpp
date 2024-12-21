@@ -299,8 +299,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
                 image.width = w2;
                 image.height = h2;
                 image.pixel_count = w2 * h2;
-                image.pixel_type = PIXEL_TYPE_RGBA;
                 image.pixels = data2;
+                image.image_settings |= 4;
             } else {
                 image_from_file(&image, input_path, memory_volatile);
             }
