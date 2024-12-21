@@ -24,6 +24,8 @@
 #include "../GameEngine/utils/StringUtils.h"
 #include "../GameEngine/asset/AssetArchive.h"
 #include "../GameEngine/audio/Audio.cpp"
+#include "../GameEngine/image/Image.cpp"
+#include "../GameEngine/image/Qoi.h"
 #include "../GameEngine/object/Mesh.h"
 #include "../GameEngine/localization/Language.h"
 #include "../GameEngine/gpuapi/opengl/ShaderUtils.h"
@@ -231,6 +233,7 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
         ++temp_asset_count;
 
         byte* element_start = archive_body;
+        uint32 uncompressed_length;
 
         uint32 element_type;
         if (strncmp(extension, ".wav", sizeof("wav") - 1) == 0) {
@@ -242,7 +245,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
             audio_from_file(&audio, input_path, memory_volatile);
 
             // Create output data
-            archive_body += audio_to_data(&audio, archive_body);
+            uncompressed_length = audio_to_data(&audio, archive_body);
+            archive_body += uncompressed_length;
         } else if (strncmp(extension, ".objtxt", sizeof("objtxt") - 1) == 0) {
             element_type = ASSET_TYPE_OBJ;
 
@@ -252,7 +256,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
             mesh_from_file_txt(&mesh, input_path, memory_volatile);
 
             // Create output data
-            archive_body += mesh_to_data(&mesh, archive_body);
+            uncompressed_length = mesh_to_data(&mesh, archive_body);
+            archive_body += uncompressed_length;
         } else if (strncmp(extension, ".langtxt", sizeof("langtxt") - 1) == 0) {
             element_type = ASSET_TYPE_LANGUAGE;
 
@@ -262,7 +267,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
             language_from_file_txt(&lang, input_path, memory_volatile);
 
             // Create output data
-            archive_body += language_to_data(&lang, archive_body);
+            uncompressed_length = language_to_data(&lang, archive_body);
+            archive_body += uncompressed_length;
         } else if (strncmp(extension, ".fonttxt", sizeof("fonttxt") - 1) == 0) {
             element_type = ASSET_TYPE_FONT;
 
@@ -272,7 +278,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
             font_from_file_txt(&font, input_path, memory_volatile);
 
             // Create output data
-            archive_body += font_to_data(&font, archive_body);
+            uncompressed_length = font_to_data(&font, archive_body);
+            archive_body += uncompressed_length;
         } else if (strncmp(extension, ".themetxt", sizeof("themetxt") - 1) == 0) {
             element_type = ASSET_TYPE_THEME;
 
@@ -282,7 +289,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
             theme_from_file_txt(&theme, input_path, memory_volatile);
 
             // Create output data
-            archive_body += theme_to_data(&theme, archive_body);
+            uncompressed_length = theme_to_data(&theme, archive_body);
+            archive_body += uncompressed_length;
         } else if (strncmp(extension, ".png", sizeof("png") - 1) == 0
             || strncmp(extension, ".bmp", sizeof("bmp") - 1) == 0
             || strncmp(extension, ".tga", sizeof("tga") - 1) == 0
@@ -305,8 +313,10 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
                 image_from_file(&image, input_path, memory_volatile);
             }
 
-            // @todo implement qoi encoding
-            archive_body += image_to_data(&image, archive_body);
+            // @performance The way how we load assets (see overhead usage) we could maybe use only the pixel data as size instead of also including the header size here
+            // The same could be said for all assets actually
+            uncompressed_length = image_data_size(&image);
+            archive_body += qoi_encode(&image, archive_body);
 
             if (strncmp(extension, ".png", sizeof("png") - 1) == 0) {
                 free(image.pixels);
@@ -324,10 +334,12 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
                 int32 opt_size = shader_program_optimize((char *) file.content, optimized);
 
                 memcpy(archive_body, optimized, opt_size);
-                archive_body += opt_size;
+                uncompressed_length = opt_size;
+                archive_body += uncompressed_length;
             } else {
                 memcpy(archive_body, file.content, file.size);
-                archive_body += file.size;
+                uncompressed_length = (uint32) file.size;
+                archive_body += uncompressed_length;
             }
         }
 
@@ -344,6 +356,10 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
         // Length
         *((uint32 *) archive_header) = SWAP_ENDIAN_LITTLE((uint32) (archive_body - element_start));
         archive_header += sizeof(uint32);
+
+        // Uncompressed
+        *((uint32 *) archive_header) = SWAP_ENDIAN_LITTLE(uncompressed_length);
+        archive_header += sizeof(uncompressed_length);
 
         // Dependency Start
         *((uint32 *) archive_header) = 0;
@@ -362,6 +378,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
 
     // Go to first asset_element (after version, asset_count, asset_dependency_count)
     archive_header = output_header.content + sizeof(int32) * 3;
+
+    // Adjust the offsets to file offsets by including the header size
     for (uint32 i = 0; i < temp_asset_count; ++i) {
         AssetArchiveElement* element = (AssetArchiveElement *) archive_header;
         element->start = SWAP_ENDIAN_LITTLE((uint32) (element->start + output_header.size));
