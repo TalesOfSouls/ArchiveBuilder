@@ -49,8 +49,34 @@ void create_base_path(const char* path, char* rel_path)
     }
 }
 
-void build_enum(RingMemory* memory_volatile, FileBody* toc, char* output_path)
+void build_enum(RingMemory* memory_volatile, FileBody* toc, char* output_path, int32 toc_id)
 {
+    char* last_dir = strrchr(output_path, '/');
+    if (!last_dir) {
+        last_dir = strrchr(output_path, '\\');
+    }
+
+    ++last_dir;
+
+    char output_name[64];
+    char namespace_name[64];
+
+    strcpy(output_name, last_dir);
+    output_name[0] = toupper_ascii(*output_name);
+
+    last_dir = output_name;
+    while(*last_dir) {
+        if (*last_dir == '.') {
+            *last_dir = '\0';
+            break;
+        }
+
+        ++last_dir;
+    }
+
+    strcpy(namespace_name, output_name);
+    toupper_ascii(namespace_name);
+
     byte* enum_file_data = ring_get_memory(memory_volatile, 1 * MEGABYTE, 4);
 
     sprintf((char *) enum_file_data,
@@ -62,12 +88,16 @@ void build_enum(RingMemory* memory_volatile, FileBody* toc, char* output_path)
         " * @version   1.0.0\n"
         " * @link      https://jingga.app\n"
         " */\n"
-        "#ifndef TOS_ASSET_ARCHIVE_IDS\n"
-        "#define TOS_ASSET_ARCHIVE_IDS\n"
+        "#ifndef TOS_ASSET_ARCHIVE_IDS_%s\n"
+        "#define TOS_ASSET_ARCHIVE_IDS_%s\n"
         "\n"
-        "enum AssetArchiveIds {\n"
+        "enum AssetArchiveIds%s {\n",
+        namespace_name,
+        namespace_name,
+        output_name
     );
 
+    int32 count = 0;
     for (int32 i = 0; i < toc->size; ++i) {
         while (toc->content[i] == '\0') {
             ++i;
@@ -78,11 +108,10 @@ void build_enum(RingMemory* memory_volatile, FileBody* toc, char* output_path)
         }
 
         char* line = (char *) (toc->content + i);
-        char buffer[512];
         char enum_name[512];
 
         // Extract the last directory and file name
-        char* last_dir = strrchr(line, '/');
+        last_dir = strrchr(line, '/');
         if (!last_dir) {
             last_dir = strrchr(line, '\\');
         }
@@ -92,37 +121,19 @@ void build_enum(RingMemory* memory_volatile, FileBody* toc, char* output_path)
             continue;
         }
 
-        const char* file_name = last_dir + 1;
-
-        // Extract the second-last directory
-        const char* second_last_dir = NULL;
-        for (const char* p = line; p < last_dir; ++p) {
-            if (*p == '/' || *p == '\\') {
-                second_last_dir = p;
-            }
-        }
-
-        if (second_last_dir == NULL) {
-            continue;
-        }
-
-        ++second_last_dir; // Move past '/'
-        *last_dir = '\0'; // Make second_last_dir string stop at last dir
-
-        // Build the enum entry name
-        snprintf(buffer, sizeof(buffer), "%s_%s", second_last_dir, file_name);
+        char* file_name = last_dir + 1;
 
         // Remove file extension
-        char* dot = strrchr(buffer, '.');
+        char* dot = strrchr(file_name, '.');
         if (dot != NULL) {
             *dot = '_';
         }
 
         // Transform to enum format
         int32 j = 0;
-        for (int32 c = 0; buffer[c] != '\0'; ++c) {
-            if (isalnum(buffer[c])) {
-                enum_name[j++] = toupper_ascii(buffer[c]);
+        for (int32 c = 0; file_name[c] != '\0'; ++c) {
+            if (isalnum(file_name[c])) {
+                enum_name[j++] = toupper_ascii(file_name[c]);
             } else {
                 enum_name[j++] = '_';
             }
@@ -130,7 +141,8 @@ void build_enum(RingMemory* memory_volatile, FileBody* toc, char* output_path)
         enum_name[j] = '\0';
 
         // Add the entry to the enum file content
-        sprintf((char *) enum_file_data + strlen((char *) enum_file_data), "    AA_ID_%s,\n", enum_name);
+        sprintf((char *) enum_file_data + strlen((char *) enum_file_data), "    AA_ID_%s = %d | (%d << 24),\n", enum_name, count, toc_id);
+        ++count;
 
         while (toc->content[i] != '\0') {
             ++i;
@@ -293,6 +305,7 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
                 image_from_file(&image, input_path, memory_volatile);
             }
 
+            // @todo implement qoi encoding
             archive_body += image_to_data(&image, archive_body);
 
             if (strncmp(extension, ".png", sizeof("png") - 1) == 0) {
@@ -302,7 +315,7 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
             element_type = ASSET_TYPE_GENERAL;
 
             FileBody file;
-            file_read(file_path, &file, memory_volatile);
+            file_read(input_path, &file, memory_volatile);
 
             if (strncmp(extension, ".fs", sizeof("fs") - 1) == 0
                 || strncmp(extension, ".vs", sizeof("vs") - 1) == 0
@@ -381,6 +394,16 @@ int32 main(int32 argc, char* argv[])
     toc.content = (byte *) malloc(sizeof(byte) * MEGABYTE * 4);
     file_read(argv[1], &toc);
 
+    // parsing the asset file id
+    int32 toc_id = atoi((char *) toc.content);
+    while (*toc.content != '\n') {
+        ++toc.content;
+        --toc.size;
+    }
+
+    ++toc.content;
+    --toc.size;
+
     RingMemory memory_volatile = {};
     memory_volatile.memory = (byte *) malloc(sizeof(byte) * GIGABYTE * 1);
     memory_volatile.head = memory_volatile.memory;
@@ -389,7 +412,7 @@ int32 main(int32 argc, char* argv[])
 
     // Careful, argv and toc both get modified.
     build_asset_archive(&memory_volatile, argv, rel_path, &toc);
-    build_enum(&memory_volatile, &toc, argv[2]);
+    build_enum(&memory_volatile, &toc, argv[2], toc_id);
 
     printf("Archive generated\n");
 }
