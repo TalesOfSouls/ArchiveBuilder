@@ -24,6 +24,7 @@
 #include "../GameEngine/utils/StringUtils.h"
 #include "../GameEngine/asset/AssetArchive.h"
 #include "../GameEngine/audio/Audio.cpp"
+#include "../GameEngine/audio/Qoa.h"
 #include "../GameEngine/image/Image.cpp"
 #include "../GameEngine/image/Qoi.h"
 #include "../GameEngine/object/Mesh.h"
@@ -253,8 +254,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
             audio_from_file(&audio, input_path, memory_volatile);
 
             // Create output data
-            uncompressed_length = audio_to_data(&audio, archive_body);
-            archive_body += uncompressed_length;
+            uncompressed_length = audio_data_size(&audio);
+            archive_body += qoa_encode(&audio, archive_body);
         } else if (strncmp(extension, ".objtxt", sizeof("objtxt") - 1) == 0) {
             element_type = ASSET_TYPE_OBJ;
 
