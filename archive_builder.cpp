@@ -131,6 +131,14 @@ void build_enum(RingMemory* memory_volatile, FileBody* toc, char* output_path, i
             *dot = '_';
         }
 
+        // If the file contains multiple . as file extension we ignore the last one
+        // The reason for this is that we sometimes need platform/api specific file names but in our enum we need the same name between all enums (e.g. compiled vulkan shaders)
+        char* dot2 = strrchr(file_name, '.');
+        if (dot2 != NULL && last_dir < dot2) {
+            *dot2 = '_';
+            *dot = '\0';
+        }
+
         // Transform to enum format
         int32 j = 0;
         for (int32 c = 0; file_name[c] != '\0'; ++c) {
