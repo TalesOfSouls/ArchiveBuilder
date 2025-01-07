@@ -12,14 +12,7 @@
 
 #include "debug.h"
 #include "../GameEngine/log/Debug.cpp"
-
-#if _WIN32
-    #include <windows.h>
-    #include "../GameEngine/platform/win32/FileUtils.cpp"
-#else
-    #include "../GameEngine/platform/linux/FileUtils.cpp"
-#endif
-
+#include "../GameEngine/system/FileUtils.cpp"
 #include "../GameEngine/ui/UITheme.h"
 #include "../GameEngine/utils/StringUtils.h"
 #include "../GameEngine/asset/AssetArchive.h"
