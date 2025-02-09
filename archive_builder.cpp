@@ -10,7 +10,6 @@
 
 #define DEBUG 0
 
-#include "debug.h"
 #include "../GameEngine/log/Debug.cpp"
 #include "../GameEngine/system/FileUtils.cpp"
 #include "../GameEngine/ui/UITheme.h"
@@ -145,7 +144,7 @@ void build_enum(RingMemory* memory_volatile, FileBody* toc, char* output_path, i
         enum_name[j] = '\0';
 
         // Add the entry to the enum file content
-        sprintf((char *) enum_file_data + strlen((char *) enum_file_data), "    AA_ID_%s = %d | (%d << 24),\n", enum_name, count, toc_id);
+        sprintf((char *) enum_file_data + str_length((char *) enum_file_data), "    AA_ID_%s = %d | (%d << 24),\n", enum_name, count, toc_id);
         ++count;
 
         while (toc->content[i] != '\0') {
@@ -153,14 +152,14 @@ void build_enum(RingMemory* memory_volatile, FileBody* toc, char* output_path, i
         }
     }
 
-    sprintf((char *) enum_file_data + strlen((char *) enum_file_data),
+    sprintf((char *) enum_file_data + str_length((char *) enum_file_data),
         "};\n\n"
         "#endif\n"
     );
 
-    FileBody enum_file;
+    FileBody enum_file = {};
     enum_file.content = enum_file_data;
-    enum_file.size = strlen((char *) enum_file_data);
+    enum_file.size = str_length((char *) enum_file_data);
 
     char* dot = strrchr(output_path, '.');
     if (dot != NULL) {
@@ -182,11 +181,11 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
 
     // Output memory ranges
     byte* archive_header = buffer_get_memory(&memory_output, 4 * MEGABYTE, 4, true);
-    FileBody output_header;
+    FileBody output_header = {};
     output_header.content = archive_header;
 
     byte* archive_body = archive_header + 4 * MEGABYTE;
-    FileBody output_body;
+    FileBody output_body = {};
     output_body.content = archive_body;
 
     *((int32 *) archive_header) = SWAP_ENDIAN_LITTLE(ASSET_ARCHIVE_VERSION);
@@ -208,7 +207,7 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
     while (*pos != '\0') {
         // Get file path
         char* file_path = (char *) pos;
-        str_move_to((char **) &pos, '\n');
+        str_move_to((const char **) &pos, '\n');
         if (*pos == '\n') {
             if (*(pos - 1) == '\r') {
                 *(pos - 1) = '\0';
@@ -221,7 +220,7 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
         char input_path[MAX_PATH];
         if (*file_path == '.') {
             memcpy(input_path, rel_path, MAX_PATH);
-            strcpy(input_path + strlen(input_path), file_path + 1);
+            strcpy(input_path + str_length(input_path), file_path + 1);
         } else {
             strcpy(input_path, file_path);
         }
@@ -326,7 +325,7 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
         } else {
             element_type = ASSET_TYPE_GENERAL;
 
-            FileBody file;
+            FileBody file = {};
             file_read(input_path, &file, memory_volatile);
 
             if (strncmp(extension, ".fs", sizeof("fs") - 1) == 0
@@ -410,7 +409,7 @@ int32 main(int32 argc, char* argv[])
     create_base_path(argv[1], rel_path);
 
     // Table of contents used to create the archive file
-    FileBody toc;
+    FileBody toc = {};
     toc.content = (byte *) malloc(sizeof(byte) * MEGABYTE * 4);
     file_read(argv[1], &toc);
 
