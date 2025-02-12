@@ -1,0 +1,10 @@
+build/*
+data/*
+bin/*
+*.obj
+*.log
+*.spv
+*.res
+*.exe
+*.map
+*.pdb

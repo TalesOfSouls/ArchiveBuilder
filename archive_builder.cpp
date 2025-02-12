@@ -10,7 +10,6 @@
 
 #define DEBUG 0
 
-#include "../GameEngine/log/Debug.cpp"
 #include "../GameEngine/system/FileUtils.cpp"
 #include "../GameEngine/ui/UITheme.h"
 #include "../GameEngine/utils/StringUtils.h"
