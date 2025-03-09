@@ -21,6 +21,7 @@
 #include "../GameEngine/object/Mesh.h"
 #include "../GameEngine/localization/Language.h"
 #include "../GameEngine/gpuapi/opengl/ShaderUtils.h"
+#include "../GameEngine/gpuapi/direct3d/ShaderUtils.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../GameEngine/image/stb_image.h"
@@ -329,9 +330,14 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
 
             if (strncmp(extension, ".fs", sizeof("fs") - 1) == 0
                 || strncmp(extension, ".vs", sizeof("vs") - 1) == 0
+                || strncmp(extension, ".hlsl", sizeof("hlsl") - 1) == 0
             ) {
+                if ()
                 char* optimized = (char *) ring_get_memory(memory_volatile, file.size, 4);
-                int32 opt_size = shader_program_optimize((char *) file.content, optimized);
+
+                int32 opt_size = strncmp(extension, ".hlsl", sizeof("hlsl") - 1)
+                    ? directx_program_optimize((char *) file.content, optimized)
+                    : opengl_program_optimize((char *) file.content, optimized);
 
                 memcpy(archive_body, optimized, opt_size);
                 uncompressed_length = opt_size;
