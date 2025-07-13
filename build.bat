@@ -39,7 +39,7 @@ if "%1"=="-d" (
 
 REM Create main program
 cl ^
-    %BUILD_FLAGS% /MT /nologo /Gm- /GR- /EHsc /W4 /wd4201 /wd4706 ^
+    %BUILD_FLAGS% /MT /nologo /Gm- /GR- /EHsc /W4 /wd4201 /wd4706 /wd4324 ^
     /wd4018 /wd4389 /wd4100 /wd4189 ^
     /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20 ^
     /D WIN32 /D _WINDOWS /D _UNICODE /D UNICODE ^

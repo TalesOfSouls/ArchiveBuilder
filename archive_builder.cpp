@@ -10,21 +10,21 @@
 
 #define DEBUG 0
 
-#include "../GameEngine/system/FileUtils.cpp"
-#include "../GameEngine/ui/UITheme.h"
-#include "../GameEngine/utils/StringUtils.h"
-#include "../GameEngine/asset/AssetArchive.h"
-#include "../GameEngine/audio/Audio.cpp"
-#include "../GameEngine/audio/Qoa.h"
-#include "../GameEngine/image/Image.cpp"
-#include "../GameEngine/image/Qoi.h"
-#include "../GameEngine/object/Mesh.h"
-#include "../GameEngine/localization/Language.h"
-#include "../GameEngine/gpuapi/opengl/ShaderUtils.h"
-#include "../GameEngine/gpuapi/direct3d/ShaderUtils.h"
+#include "../cOMS/system/FileUtils.cpp"
+#include "../cOMS/ui/UITheme.h"
+#include "../cOMS/utils/StringUtils.h"
+#include "../cOMS/asset/AssetArchive.h"
+#include "../cOMS/audio/Audio.cpp"
+#include "../cOMS/audio/Qoa.h"
+#include "../cOMS/image/Image.cpp"
+#include "../cOMS/image/Qoi.h"
+#include "../cOMS/object/Mesh.h"
+#include "../cOMS/localization/Language.h"
+#include "../cOMS/gpuapi/opengl/ShaderUtils.h"
+#include "../cOMS/gpuapi/direct3d/ShaderUtils.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "../GameEngine/image/stb_image.h"
+#include "../cOMS/image/stb_image.h"
 
 void create_base_path(const char* path, char* rel_path)
 {
@@ -332,7 +332,6 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
                 || strncmp(extension, ".vs", sizeof("vs") - 1) == 0
                 || strncmp(extension, ".hlsl", sizeof("hlsl") - 1) == 0
             ) {
-                if ()
                 char* optimized = (char *) ring_get_memory(memory_volatile, file.size, 4);
 
                 int32 opt_size = strncmp(extension, ".hlsl", sizeof("hlsl") - 1)
