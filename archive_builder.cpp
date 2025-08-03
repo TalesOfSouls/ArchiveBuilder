@@ -247,6 +247,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
 
             // Create output data
             uncompressed_length = audio_data_size(&audio);
+
+            archive_body += audio_header_to_data(&audio, archive_body);
             archive_body += qoa_encode(&audio, archive_body);
         } else if (strncmp(extension, ".objtxt", sizeof("objtxt") - 1) == 0) {
             element_type = ASSET_TYPE_OBJ;
@@ -317,6 +319,8 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
             // @performance The way how we load assets (see overhead usage) we could maybe use only the pixel data as size instead of also including the header size here
             // The same could be said for all assets actually
             uncompressed_length = image_data_size(&image);
+
+            archive_body += image_header_to_data(&image, archive_body);
             archive_body += qoi_encode(&image, archive_body);
 
             if (strncmp(extension, ".png", sizeof("png") - 1) == 0) {
