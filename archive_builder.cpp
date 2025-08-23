@@ -193,7 +193,7 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
 
     *((uint32 *) archive_header) = 0;
     uint32* asset_count = (uint32 *) archive_header;
-    uint32 temp_asset_count = 0;
+    int32 temp_asset_count = 0;
     archive_header += sizeof(uint32);
 
     *((uint32 *) archive_header) = 0;
@@ -389,7 +389,7 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
     archive_header = output_header.content + sizeof(int32) * 3;
 
     // Adjust the offsets to file offsets by including the header size
-    for (uint32 i = 0; i < temp_asset_count; ++i) {
+    for (int32 i = 0; i < temp_asset_count; ++i) {
         AssetArchiveElement* element = (AssetArchiveElement *) archive_header;
         element->start = SWAP_ENDIAN_LITTLE((uint32) (element->start + output_header.size));
         element->dependency_start = SWAP_ENDIAN_LITTLE((uint32) (element->dependency_start + output_header.size));
