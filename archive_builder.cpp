@@ -180,7 +180,7 @@ void build_asset_archive(RingMemory* memory_volatile, char* argv[], const char* 
     memory_output.end = memory_output.memory + memory_output.size;
 
     // Output memory ranges
-    byte* archive_header = buffer_get_memory(&memory_output, 4 * MEGABYTE, 4, true);
+    byte* archive_header = buffer_get_memory(&memory_output, 4 * MEGABYTE, 4);
     FileBody output_header = {};
     output_header.content = archive_header;
 
