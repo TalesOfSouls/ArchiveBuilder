@@ -136,6 +136,7 @@ void build_enum(RingMemory* memory_volatile, const char* enum_char, int32 asset_
 
     for (int32 i = 0; i < asset_count; ++i) {
         // Add the entry to the enum file content
+        // @performance It is horrible performance to call strlen every time on the entire output data
         sprintf(
             (char *) enum_file_data + strlen((char *) enum_file_data),
             "    AA_ID_%s = %d | (%d << 24),\n",
@@ -287,6 +288,16 @@ void build_asset(
                 header,
                 archive_id
             );
+
+            // Here we generate the enum file for the elements in the texture atlas
+            FileBody enum_file = {0};
+            enum_file.content = (byte *) atlas_enum_from_file_txt(abs_input_path, memory_volatile);
+            enum_file.size = strlen((const char*) enum_file.content);
+
+            char* atlas_extension = strrchr(abs_input_path, '.');
+            memcpy(atlas_extension, ".h", sizeof(".h"));
+
+            file_write(abs_input_path, &enum_file);
         }
         header->asset_dependencies[element->dependency_start + dependency_index] = texture_id;
     } else if (strncmp(extension, ".fonttxt", sizeof("fonttxt") - 1) == 0) {
