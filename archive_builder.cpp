@@ -114,7 +114,7 @@ void build_enum(RingMemory* memory_volatile, const char* enum_char, int32 asset_
     strcpy(namespace_name, output_name);
     str_toupper(namespace_name);
 
-    byte* enum_file_data = ring_memory_get(memory_volatile, 1 * MEGABYTE, sizeof(size_t));
+    byte* enum_file_data = memory_get(memory_volatile, 1 * MEGABYTE, sizeof(size_t));
 
     sprintf((char *) enum_file_data,
         "/**\n"
@@ -203,7 +203,7 @@ void build_asset(
 
         // Read file
         Audio audio;
-        audio.data = ring_memory_get(memory_volatile, file_size(abs_input_path) + sizeof(Audio), 4);
+        audio.data = memory_get(memory_volatile, file_size(abs_input_path) + sizeof(Audio), 4);
         audio_from_file(&audio, abs_input_path, memory_volatile);
 
         // Create output data
@@ -218,7 +218,7 @@ void build_asset(
 
         // Read file
         Mesh mesh;
-        mesh.data = ring_memory_get(memory_volatile, file_size(abs_input_path) * 2 + sizeof(Mesh), 4);
+        mesh.data = memory_get(memory_volatile, file_size(abs_input_path) * 2 + sizeof(Mesh), 4);
         mesh_from_file_txt(&mesh, abs_input_path, memory_volatile);
 
         // Create output data
@@ -231,7 +231,7 @@ void build_asset(
 
         // Read file
         Language lang;
-        lang.data = ring_memory_get(memory_volatile, file_size(abs_input_path) + 1024, 4);
+        lang.data = memory_get(memory_volatile, file_size(abs_input_path) + 1024, 4);
         language_from_file_txt(&lang, abs_input_path, memory_volatile);
 
         // Create output data
@@ -262,7 +262,7 @@ void build_asset(
         if (is_external) {
             texture_id = (int32) str_to_int(atlas.texture_name);
         } else {
-            char dependency_input_path[MAX_PATH];
+            char dependency_input_path[PATH_MAX_LENGTH];
             int32 i = 0;
 
             if (atlas.texture_name[0] != '.') {
@@ -277,7 +277,7 @@ void build_asset(
             dependency_input_path[i] = '\0';
 
             texture_id = (header->asset_count) | (archive_id << 24);
-            char new_rel_path[MAX_PATH] = {0};
+            char new_rel_path[PATH_MAX_LENGTH] = {0};
             create_base_path(abs_input_path, new_rel_path);
             build_asset(
                 memory_volatile,
@@ -305,7 +305,7 @@ void build_asset(
 
         // Read file
         Font font = {0};
-        font.glyphs = (Glyph *) ring_memory_get(memory_volatile, file_size(abs_input_path) + sizeof(Glyph), 4);
+        font.glyphs = (Glyph *) memory_get(memory_volatile, file_size(abs_input_path) + sizeof(Glyph), 4);
         font_from_file_txt(&font, abs_input_path, memory_volatile);
 
         // Create output data
@@ -324,7 +324,7 @@ void build_asset(
         if (is_external) {
             texture_id = (int32) str_to_int(font.texture_name);
         } else {
-            char dependency_input_path[MAX_PATH];
+            char dependency_input_path[PATH_MAX_LENGTH];
             int32 i = 0;
 
             if (font.texture_name[0] != '.') {
@@ -339,7 +339,7 @@ void build_asset(
             dependency_input_path[i] = '\0';
 
             texture_id = (header->asset_count) | (archive_id << 24);
-            char new_rel_path[MAX_PATH] = {0};
+            char new_rel_path[PATH_MAX_LENGTH] = {0};
             create_base_path(abs_input_path, new_rel_path);
             build_asset(
                 memory_volatile,
@@ -357,7 +357,7 @@ void build_asset(
 
         // Read file
         UIThemeStyle theme;
-        theme.data = ring_memory_get(memory_volatile, file_size(abs_input_path) * 2 + sizeof(UIThemeStyle), 4);
+        theme.data = memory_get(memory_volatile, file_size(abs_input_path) * 2 + sizeof(UIThemeStyle), 4);
         theme_from_file_txt(&theme, abs_input_path, memory_volatile);
 
         // Create output data
@@ -408,7 +408,7 @@ void build_asset(
         FileBody file = {0};
         file_read(abs_input_path, &file, memory_volatile);
 
-        char* optimized = (char *) ring_memory_get(memory_volatile, file.size, 4);
+        char* optimized = (char *) memory_get(memory_volatile, file.size, 4);
 
         const int32 opt_size = strncmp(extension, ".hlsl", sizeof("hlsl") - 1)
             ? directx_program_optimize((char *) file.content, optimized)
@@ -459,7 +459,7 @@ int32 build_asset_archive(
     // We just pick a generous offset.
     // Don't worry we will not store empty space in our archive file
     FileBody output_body = {0};
-    output_body.content = buffer_memory_get(&memory_output, 4 * GIGABYTE, sizeof(size_t));
+    output_body.content = memory_get(&memory_output, 4 * GIGABYTE, sizeof(size_t));
 
     // We need some space in the beginning for the header
     byte* body_start = output_body.content + 100 * MEGABYTE;
