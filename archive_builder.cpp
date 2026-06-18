@@ -181,7 +181,7 @@ void build_asset(
     }
 
     if (!file_exists(abs_input_path)) {
-        printf("Couldn't find %s\n", abs_input_path);
+        printf("\x1b[31mCouldn't find %s\x1b[0m\n", abs_input_path);
         return;
     }
 
@@ -276,7 +276,7 @@ void build_asset(
 
             dependency_input_path[i] = '\0';
 
-            texture_id = (header->asset_count) | (archive_id << 24);
+            texture_id = ASSET_ID_FROM_ARCHIVE_AND_ASSET(header->asset_count, archive_id);
             char new_rel_path[PATH_MAX_LENGTH] = {0};
             create_base_path(abs_input_path, new_rel_path);
             build_asset(
@@ -288,16 +288,6 @@ void build_asset(
                 header,
                 archive_id
             );
-
-            // Here we generate the enum file for the elements in the texture atlas
-            FileBody enum_file = {0};
-            enum_file.content = (byte *) atlas_enum_from_file_txt(abs_input_path, memory_volatile);
-            enum_file.size = strlen((const char*) enum_file.content);
-
-            char* atlas_extension = strrchr(abs_input_path, '.');
-            memcpy(atlas_extension, ".h", sizeof(".h"));
-
-            file_write(abs_input_path, &enum_file);
         }
         header->asset_dependencies[element->dependency_start + dependency_index] = texture_id;
     } else if (strncmp(extension, ".fonttxt", sizeof("fonttxt") - 1) == 0) {
@@ -338,7 +328,7 @@ void build_asset(
 
             dependency_input_path[i] = '\0';
 
-            texture_id = (header->asset_count) | (archive_id << 24);
+            texture_id = ASSET_ID_FROM_ARCHIVE_AND_ASSET(header->asset_count, archive_id);
             char new_rel_path[PATH_MAX_LENGTH] = {0};
             create_base_path(abs_input_path, new_rel_path);
             build_asset(
@@ -356,8 +346,8 @@ void build_asset(
         element->type = ASSET_TYPE_THEME;
 
         // Read file
-        UIThemeStyle theme;
-        theme.data = memory_get(memory_volatile, file_size(abs_input_path) * 2 + sizeof(UIThemeStyle), 4);
+        UITheme theme;
+        theme.data = memory_get(memory_volatile, file_size(abs_input_path) * 2 + sizeof(UITheme), 4);
         theme_from_file_txt(&theme, abs_input_path, memory_volatile);
 
         // Create output data
@@ -559,7 +549,7 @@ int32 main(int32 argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    printf("Generating archive...\n");
+    printf("Generating archive %s\n", argv[2]);
 
     char rel_path[PATH_MAX_LENGTH];
     create_base_path(argv[1], rel_path);
@@ -592,5 +582,5 @@ int32 main(int32 argc, char* argv[])
     int32 asset_count = build_asset_archive(&memory_volatile, argv, rel_path, enum_char, &toc, toc_id);
     build_enum(&memory_volatile, enum_char, asset_count, argv[2], toc_id);
 
-    printf("Archive generated\n");
+    printf("\x1b[32mCreated archive %s\x1b[0m\n", argv[2]);
 }
