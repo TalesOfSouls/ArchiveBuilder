@@ -26,25 +26,7 @@
 #include "../cOMS/gpuapi/direct3d/ShaderUtils.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "../cOMS/image/stb_image.h"
-
-void create_base_path(const char* path, char* rel_path)
-{
-    if (*path == '.') {
-        relative_to_absolute(path, rel_path);
-    } else {
-        strcpy(rel_path, path);
-    }
-
-    char* dir = strrchr(rel_path, '/');
-    if (!dir) {
-        dir = strrchr(rel_path, '\\');
-    }
-
-    if (dir) {
-        *dir = '\0';
-    }
-}
+#include "../EngineDependencies/image/stb_image.h"
 
 void enum_name_from_path(const char* path, char* enum_name) {
     // Extract the last directory and file name
@@ -134,17 +116,17 @@ void build_enum(RingMemory* memory_volatile, const char* enum_char, int32 asset_
         output_name
     );
 
+    char* enum_file_data_temp = (char *) enum_file_data + strlen((char *) enum_file_data);
     for (int32 i = 0; i < asset_count; ++i) {
         // Add the entry to the enum file content
-        // @performance It is horrible performance to call strlen every time on the entire output data
-        sprintf(
-            (char *) enum_file_data + strlen((char *) enum_file_data),
+        enum_file_data_temp += sprintf(
+            enum_file_data_temp,
             "    AA_ID_%s = %d | (%d << 24),\n",
             &enum_char[64 * i], i, toc_id
         );
     }
 
-    sprintf((char *) enum_file_data + strlen((char *) enum_file_data),
+    sprintf(enum_file_data_temp,
         "};\n\n"
         "#endif\n"
     );
@@ -278,7 +260,7 @@ void build_asset(
 
             texture_id = ASSET_ID_FROM_ARCHIVE_AND_ASSET(header->asset_count, archive_id);
             char new_rel_path[PATH_MAX_LENGTH] = {0};
-            create_base_path(abs_input_path, new_rel_path);
+            build_base_path(abs_input_path, new_rel_path);
             build_asset(
                 memory_volatile,
                 new_rel_path,
@@ -330,7 +312,7 @@ void build_asset(
 
             texture_id = ASSET_ID_FROM_ARCHIVE_AND_ASSET(header->asset_count, archive_id);
             char new_rel_path[PATH_MAX_LENGTH] = {0};
-            create_base_path(abs_input_path, new_rel_path);
+            build_base_path(abs_input_path, new_rel_path);
             build_asset(
                 memory_volatile,
                 new_rel_path,
@@ -377,8 +359,6 @@ void build_asset(
             image_from_file(&image, abs_input_path, memory_volatile);
         }
 
-        // @performance The way how we load assets (see overhead usage) we could maybe use only the pixel data as size instead of also including the header size here
-        // The same could be said for all assets actually
         element->uncompressed = image_data_size(&image);
 
         *archive_body += image_header_to_data(&image, *archive_body);
@@ -404,10 +384,8 @@ void build_asset(
             ? directx_program_optimize((char *) file.content, optimized)
             : opengl_program_optimize((char *) file.content, optimized);
 
-        // @todo we should compress this file here
-        memcpy(*archive_body, optimized, opt_size);
         element->uncompressed = opt_size;
-        *archive_body += element->uncompressed;
+        *archive_body += lz4_encode((byte *) optimized, opt_size, *archive_body);
 
         element->length = (uint32) ((uintptr_t) *archive_body - (uintptr_t) element_start);
     } else {
@@ -416,10 +394,8 @@ void build_asset(
         FileBody file = {0};
         file_read(abs_input_path, &file, memory_volatile);
 
-        // @todo we should compress this file here
-        memcpy(*archive_body, file.content, file.size);
         element->uncompressed = (uint32) file.size;
-        *archive_body += element->uncompressed;
+        *archive_body += lz4_encode(file.content, file.size, *archive_body);
 
         element->length = (uint32) ((uintptr_t) *archive_body - (uintptr_t) element_start);
     }
@@ -505,7 +481,7 @@ int32 build_asset_archive(
         + header.asset_dependency_count * sizeof(int32))
         - header.asset_element[0].start;
 
-    for (int i = 0; i < header.asset_count; ++i) {
+    for (uint32 i = 0; i < header.asset_count; ++i) {
         header.asset_element[i].start += header_offset;
     }
 
@@ -537,7 +513,9 @@ int32 build_asset_archive(
     output_body.size = output - output_body.content;
 
     // We now write the data to the file
-    file_write(argv[2], &output_body);
+    char argv_path[PATH_MAX_LENGTH];
+    relative_to_absolute(argv[2], argv_path);
+    file_write(argv_path, &output_body);
 
     return header.asset_count;
 }
@@ -552,12 +530,15 @@ int32 main(int32 argc, char* argv[])
     printf("Generating archive %s\n", argv[2]);
 
     char rel_path[PATH_MAX_LENGTH];
-    create_base_path(argv[1], rel_path);
+    build_base_path(argv[1], rel_path);
 
     // Table of contents used to create the archive file
     FileBody toc = {0};
     toc.content = (byte *) malloc(sizeof(byte) * MEGABYTE * 4);
-    file_read(argv[1], &toc);
+
+    char argv_path[PATH_MAX_LENGTH];
+    relative_to_absolute(argv[1], argv_path);
+    file_read(argv_path, &toc);
 
     // parsing the asset file id
     int32 toc_id = atoi((char *) toc.content);
