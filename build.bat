@@ -33,13 +33,13 @@ set "DEBUG_DATA=/Fd"%DESTINATION_DIR%\%EXE_NAME%.pdb" /Fm"%DESTINATION_DIR%\%EXE
 REM Parse command-line arguments
 if "%1"=="-r" (
     set "BUILD_TYPE=RELEASE"
-    set "BUILD_FLAGS=/O2 /D NDEBUG"
+    set "BUILD_FLAGS=/O2 /D NDEBUG /D LOG_LEVEL=1"
 
     set "DEBUG_DATA="
 )
 if "%1"=="-d" (
     set "BUILD_TYPE=DEBUG"
-    set "BUILD_FLAGS=/Od /Z7 /WX /FC /RTC1 /DDEBUG"
+    set "BUILD_FLAGS=/Od /Z7 /WX /FC /RTC1 /DDEBUG /D LOG_LEVEL=3"
 
     set "DEBUG_DATA=/Fd"%DESTINATION_DIR%\%EXE_NAME%.pdb" /Fm"%DESTINATION_DIR%\%EXE_NAME%.map""
 )
