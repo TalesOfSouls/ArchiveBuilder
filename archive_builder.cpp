@@ -20,6 +20,7 @@
 #include "../cOMS/image/Image.cpp"
 #include "../cOMS/image/Qoi.h"
 #include "../cOMS/object/Mesh.cpp"
+#include "../cOMS/object/ModelParser.h"
 #include "../cOMS/object/TextureAtlas.cpp"
 #include "../cOMS/localization/Language.cpp"
 #include "../cOMS/gpuapi/opengl/ShaderUtils.h"
@@ -205,6 +206,31 @@ void build_asset(
 
         // Create output data
         element->uncompressed = mesh_to_data(&mesh, *archive_body);
+        *archive_body += element->uncompressed;
+
+        element->length = (uint32) ((uintptr_t) *archive_body - (uintptr_t) element_start);
+    } else if (strncmp(extension, ".modeltxt", sizeof(".modeltxt") - 1) == 0) {
+        element->type = ASSET_TYPE_MODEL;
+
+        // Read file (null terminated)
+        FileBody file = {0};
+        file_read(abs_input_path, &file, memory_volatile);
+
+        ModelFile model;
+        ModelError error = {};
+        bool ok = file.content && model_measure((const char *) file.content, &model, &error);
+        if (ok) {
+            byte* const model_memory = memory_get(memory_volatile, model_memory_size(&model), MODEL_MEMORY_ALIGNMENT);
+            ok = model_parse((const char *) file.content, &model, model_memory, &error);
+        }
+
+        if (!ok) {
+            printf("\x1b[31m%s:%d %s\x1b[0m\n", abs_input_path, error.line, error.message ? error.message : "Couldn't read the file");
+            exit(EXIT_FAILURE);
+        }
+
+        // Create output data
+        element->uncompressed = (uint32) model_to_data(&model, *archive_body);
         *archive_body += element->uncompressed;
 
         element->length = (uint32) ((uintptr_t) *archive_body - (uintptr_t) element_start);
