@@ -29,6 +29,140 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../EngineDependencies/image/stb_image.h"
 
+// Archive mode (command line -d / -r, default debug)
+//      debug       debug archives: text assets keep their debug blocks
+//      release     release archives: the debug blocks are removed
+static bool _archive_release = false;
+
+// Debug blocks in text assets (shaders):
+//      // @debug_begin
+//      ... code that only exists in debug archives (e.g. debug colors) ...
+//      // @debug_end
+// The markers must be on their own lines, blocks can't be nested
+
+enum AssetDebugMarker : byte {
+    ASSET_DEBUG_MARKER_NONE,
+    ASSET_DEBUG_MARKER_BEGIN,
+    ASSET_DEBUG_MARKER_END,
+};
+
+/**
+ * Checks if a line is a debug block marker ("// @debug_begin" or "// @debug_end", whitespace allowed)
+ *
+ * @param const char* line Line start
+ * @param const char* end Line end (exclusive)
+ *
+ * @return AssetDebugMarker
+ */
+static
+AssetDebugMarker asset_debug_marker(const char* line, const char* end)
+{
+    while (line < end && (*line == ' ' || *line == '\t')) {
+        ++line;
+    }
+
+    if (end - line < 2 || line[0] != '/' || line[1] != '/') {
+        return ASSET_DEBUG_MARKER_NONE;
+    }
+
+    line += 2;
+    while (line < end && (*line == ' ' || *line == '\t')) {
+        ++line;
+    }
+
+    // Trailing whitespace (incl. \r of windows line endings)
+    while (end > line && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r')) {
+        --end;
+    }
+
+    const size_t length = (size_t) (end - line);
+    if (length == sizeof("@debug_begin") - 1 && memcmp(line, "@debug_begin", length) == 0) {
+        return ASSET_DEBUG_MARKER_BEGIN;
+    }
+
+    if (length == sizeof("@debug_end") - 1 && memcmp(line, "@debug_end", length) == 0) {
+        return ASSET_DEBUG_MARKER_END;
+    }
+
+    return ASSET_DEBUG_MARKER_NONE;
+}
+
+/**
+ * Handles the debug blocks of a text asset
+ *      debug archive:   the text is copied unchanged (the markers are comments)
+ *      release archive: the lines of the debug blocks incl. the markers become empty lines
+ *                       (the line numbers stay the same -> compile errors point to the right line)
+ *
+ * @param const char* input Text (null terminated)
+ * @param char* output Output (at least strlen(input) + 1 bytes)
+ * @param bool release Remove the debug blocks
+ * @param const char* path File path (error messages)
+ *
+ * @return int32 Output length, -1 = invalid markers (error printed)
+ */
+static
+int32 asset_debug_blocks(const char* input, char* output, bool release, const char* path)
+{
+    const char* pos = input;
+    char* out = output;
+
+    int32 line_number = 0;
+    int32 begin_line = 0;
+    bool in_block = false;
+
+    while (*pos) {
+        const char* line_end = pos;
+        while (*line_end && *line_end != '\n') {
+            ++line_end;
+        }
+
+        ++line_number;
+
+        const AssetDebugMarker marker = asset_debug_marker(pos, line_end);
+        if (marker == ASSET_DEBUG_MARKER_BEGIN) {
+            if (in_block) {
+                fprintf(stderr, "%s:%d: @debug_begin inside of the debug block of line %d (blocks can't be nested)\n", path, line_number, begin_line);
+
+                return -1;
+            }
+
+            in_block = true;
+            begin_line = line_number;
+        } else if (marker == ASSET_DEBUG_MARKER_END) {
+            if (!in_block) {
+                fprintf(stderr, "%s:%d: @debug_end without @debug_begin\n", path, line_number);
+
+                return -1;
+            }
+
+            in_block = false;
+        }
+
+        // Removed lines keep their line break
+        if (!release || (!in_block && marker == ASSET_DEBUG_MARKER_NONE)) {
+            memcpy(out, pos, (size_t) (line_end - pos));
+            out += line_end - pos;
+        }
+
+        if (*line_end == '\n') {
+            *out++ = '\n';
+            pos = line_end + 1;
+        } else {
+            pos = line_end;
+        }
+    }
+
+    if (in_block) {
+        fprintf(stderr, "%s:%d: @debug_begin without @debug_end\n", path, begin_line);
+
+        return -1;
+    }
+
+    *out = '\0';
+
+    return (int32) (out - output);
+}
+
 void enum_name_from_path(const char* path, char* enum_name) {
     // Extract the last directory and file name
     const char* last_dir = strrchr(path, '/');
@@ -404,11 +538,17 @@ void build_asset(
         FileBody file = {0};
         file_read(abs_input_path, &file, memory_volatile);
 
-        char* optimized = (char *) memory_get(memory_volatile, file.size, 4);
+        // Debug blocks (removed in release archives)
+        char* source = (char *) memory_get(memory_volatile, file.size + 1, 4);
+        if (asset_debug_blocks((const char *) file.content, source, _archive_release, abs_input_path) < 0) {
+            exit(EXIT_FAILURE);
+        }
 
-        const int32 opt_size = strncmp(extension, ".hlsl", sizeof("hlsl") - 1)
-            ? directx_program_optimize((char *) file.content, optimized)
-            : opengl_program_optimize((char *) file.content, optimized);
+        char* optimized = (char *) memory_get(memory_volatile, file.size + 1, 4);
+
+        const int32 opt_size = strncmp(extension, ".hlsl", sizeof("hlsl") - 1) == 0
+            ? directx_program_optimize(source, optimized)
+            : opengl_program_optimize(source, optimized);
 
         element->uncompressed = opt_size;
         *archive_body += lz4_encode((byte *) optimized, opt_size, *archive_body);
@@ -549,11 +689,24 @@ int32 build_asset_archive(
 int32 main(int32 argc, char* argv[])
 {
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input> <output>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input> <output> [-d|-r]\n", argv[0]);
+        fprintf(stderr, "    -d  debug archive (default): debug blocks of text assets are kept\n");
+        fprintf(stderr, "    -r  release archive: debug blocks (// @debug_begin ... // @debug_end) are removed\n");
         return EXIT_FAILURE;
     }
 
-    printf("Generating archive %s\n", argv[2]);
+    for (int32 i = 3; i < argc; ++i) {
+        if (strcmp(argv[i], "-r") == 0) {
+            _archive_release = true;
+        } else if (strcmp(argv[i], "-d") == 0) {
+            _archive_release = false;
+        } else {
+            fprintf(stderr, "Unknown option %s (-d = debug archive, -r = release archive)\n", argv[i]);
+            return EXIT_FAILURE;
+        }
+    }
+
+    printf("Generating %s archive %s\n", _archive_release ? "release" : "debug", argv[2]);
 
     char rel_path[PATH_MAX_LENGTH];
     build_base_path(argv[1], rel_path);
